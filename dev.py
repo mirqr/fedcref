@@ -2,21 +2,20 @@
 import multiprocessing
 import os
 import random
-import re
 import time
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"    
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import ray
 import tensorflow as tf
 from joblib import Memory
 
-cachedir = '.cachejoblib/'
-#memory = Memory(cachedir, verbose=2)
-memory = Memory(location="/dev/shm/joblib_cache", verbose=2) 
+cachedir = ".cachejoblib/"
+cachedir = "/dev/shm/joblib_cache"  # Use in-memory storage for caching
+memory = Memory(location=cachedir, verbose=2)
+
 
 
 import flwr as fl
@@ -29,9 +28,7 @@ from sklearn.metrics import (
     recall_score,
 )
 from sklearn.metrics.cluster import normalized_mutual_info_score
-from sklearn.model_selection import train_test_split
 from tensorflow.keras import layers, losses
-from tensorflow.keras.datasets import fashion_mnist, mnist
 from tensorflow.keras.models import Model
 
 from utils.fl_client import *
@@ -40,11 +37,6 @@ from utils.util_data import get_dataset
 from utils.util_dev import *
 from utils.util_models import *
 
-
-def ensure_directory_exists(dir_path):
-    """Ensures the directory exists. If not, creates it."""
-    if not os.path.exists(dir_path):
-        os.makedirs(dir_path)
 
 @concurrent.process(context=multiprocessing.get_context('spawn'))
 def fit_dec_ray(x_train, y_train, data_name):
@@ -66,7 +58,6 @@ def fit_dec_static_kmnist(x_train, y_train, data_name, iter_max):
         print(dict(zip(unique, counts)))
         X = x_train_real
         Y = y_train_real
-    #iter_max=1e4
     else:
         X = x_train
         Y = y_train
@@ -99,7 +90,6 @@ def fit_dec_static(x_train, y_train, data_name):
     y_clust = q.argmax(1)
     return y_clust
 
-
 #@memory.cache
 def train_single_autoencoder(x):
     model = get_model_autoencoder()
@@ -117,33 +107,9 @@ def _train_autoencoders(x_data: dict):
         models[lab] = train_single_autoencoder(x)
     return models
 
-@concurrent.process(context=multiprocessing.get_context('spawn'))
-def train_autoencoders(x_data: dict):
-    return _train_autoencoders(x_data)
-
 @ray.remote
 def train_autoencoders_ray(x_data: dict):
     return _train_autoencoders(x_data)
-
-# a subprocess for each device
-@concurrent.process(context=multiprocessing.get_context('spawn'))
-def predict_single_autoencoder_parallel(dev_name, y , models_w, datasets):
-    #y_hash = get_sha256_hash(y)
-    cache = {}
-    print('predict_single_autoencoder_parallel', dev_name)
-    for lab, mod_w in models_w:
-        m = get_model_autoencoder()
-        m.set_weights(mod_w)
-        for dev2, device_datasets in datasets.items():
-            for lab2, x2 in device_datasets.items():
-                cache_key = f"{dev_name}-{lab}_{dev2}-{lab2}_model_={m.get_model_hash()}" # TODO attenzione
-                pred = m.predict(x2, verbose=0, batch_size=128)
-                errors = np.mean(np.square(pred - x2), axis=(1)) # #TODO carefull. must be the same as in the model
-                #errors = Dev.compute_reconstruction_errors_new(model_device_name = dev_name, model_label = lab, model = m, data_device_name = dev2, data_label = lab2, data = x2, reset=reset)
-                # just write to cache. single file problem (TODO)
-                cache[cache_key] = errors.tolist()
-    return cache
-
 
 @ray.remote
 def predict_single_autoencoder_parallel_ray(dev_name, y , models_w, datasets, devs_stop: dict):
@@ -161,34 +127,8 @@ def predict_single_autoencoder_parallel_ray(dev_name, y , models_w, datasets, de
                 cache_key = f"{dev_name}-{lab}_{dev2}-{lab2}_model_={m.get_model_hash()}" # TODO attenzione
                 pred = m.predict(x2, verbose=0, batch_size=128)
                 errors = np.mean(np.square(pred - x2), axis=(1)) # #TODO carefull. must be the same as in the model
-                #errors = Dev.compute_reconstruction_errors_new(model_device_name = dev_name, model_label = lab, model = m, data_device_name = dev2, data_label = lab2, data = x2, reset=reset)
-                # just write to cache. single file problem (TODO)
                 cache[cache_key] = errors.tolist()
     return cache
-
-
-def _predict_single_autoencoder_mods(dev_name, models_w, my_dataset):
-    #y_hash = get_sha256_hash(y)
-    cache = {}
-    print('predict_single_autoencoder_parallel', dev_name)        
-    for dev2, device_models in models_w.items():
-        for lab2, mod_w in device_models.items():
-            m = get_model_autoencoder()
-            m.set_weights(mod_w)
-            for lab1, x1 in my_dataset.items():
-                cache_key = f"{dev_name}-{lab1}_{dev2}-{lab2}_model_={m.get_model_hash()}" # invia i modelli, aggiustare il recupero da cache
-                pred = m.predict(x1, verbose=0, batch_size=128)
-                errors = np.mean(np.square(pred - x1), axis=(1)) # #TODO carefull. must be the same as in the model
-                cache[cache_key] = errors.tolist()
-    return cache
-
-@concurrent.process(context=multiprocessing.get_context('spawn'))
-def predict_single_autoencoder_parallel_mods(dev_name, models_w, my_dataset):
-    return _predict_single_autoencoder_mods(dev_name, models_w, my_dataset)
-
-@ray.remote
-def predict_single_autoencoder_parallel_mods_ray(dev_name, models_w, my_dataset):
-    return _predict_single_autoencoder_mods(dev_name, models_w, my_dataset)
 
 
 
@@ -232,15 +172,12 @@ class DevManager:
 
 
     def add_device(self, dev):
-        # assert dev.name not in self.devices.keys()
-        #assert dev.name not in self.devices.keys() # to avoid overwriting
         self.devices[dev.name] = dev
 
     def get_device(self, dev_name):
         return self.devices[dev_name]
     
     def get_dev_number(self):
-        print('calling get_dev_number', len(self.devices))
         return len(self.devices)
 
     def get_num_ideal_communities(self):
@@ -305,9 +242,6 @@ class DevManager:
         # iterate on the last consecutive_limit values
         
         for i in range(len(values)-consecutive_limit, len(values)):
-            
-            #base = (values[i] + values[i-1]) / 2  # Use the average as the base
-            #percentage_diff = abs(values[i] - values[i-1]) / max(base, 1) * 100
             percentage_diff = abs(values[i] - values[i-1]) / max(values[i-1], 1) * 100
             print("Percentage difference between {} and {} is {:.2f}%".format(values[i-1], values[i], percentage_diff))
 
@@ -345,29 +279,6 @@ class DevManager:
         
     
     # TRAIN
-    def train_local_autoencoders_sequential(self):
-        for dev in self.devices.values():
-            models = dev.train_dev_autoencoders(train_only_labs=None)
-            dev.assign_trained_local_models(models)
-    
-
-    def train_local_autoencoders_parallel(self):
-        print('train_all')
-        all_futures = []
-
-        for dev in self.devices.values():
-            x_data = dev.prepare_data_for_training(train_only_labs=None)
-            future = train_autoencoders(x_data)
-            all_futures.append((dev, future))
-        
-        for dev, future in all_futures:
-            models = {}
-            mod_weights = future.result()
-            for lab, weights in mod_weights.items():
-                models[lab] = get_model_autoencoder()
-                models[lab].set_weights(weights)
-            dev.assign_trained_local_models(models)
-    
     def train_local_autoencoders_parallel_ray(self):
         print('train_all')
         all_futures = []
@@ -386,11 +297,6 @@ class DevManager:
                 models[lab] = get_model_autoencoder()
                 models[lab].set_weights(weights)
             dev.assign_trained_local_models(models)
-        
-        #for dev in lll:
-            #if dev.is_stable():
-                #dev.stop_train = True
-                #print('STOP TRAIN', dev.name)       
 
     def stop_stable_devices(self):
         for dev in self.devices.values():
@@ -399,71 +305,6 @@ class DevManager:
                 print('STOP TRAIN', dev.name)
 
     # END TRAIN
-
-    def predict_local_parallel_mods(self):
-        for selected in self.list_split:
-            all_models_w = self._collect_all_current_models(selected)
-            # take 2 first elements of datasets dictionary
-            all_futures = []
-            for dev in selected.values():
-                my_dataset = dev.x_dic_clust
-                future = predict_single_autoencoder_parallel_mods(dev.name, all_models_w, my_dataset)
-                all_futures.append((dev, future))
-            
-            for dev, future in all_futures:
-                cache = future.result()
-                #append_to_cache(cache)
-                dev.dev_cache.update(cache)
-
-            print('predict split DONE')
-        
-        print('predict_local_parallel DONE')
-
-    def predict_local_parallel_mods_ray(self):
-        for selected in self.list_split:
-            all_models_w = self._collect_all_current_models(selected)
-            #all_models_w = self._collect_all_current_models(selected)
-            # take 2 first elements of datasets dictionary
-            all_futures = []
-            for dev in selected.values():
-                my_dataset = dev.x_dic_clust
-                future = predict_single_autoencoder_parallel_mods_ray.remote(dev.name, all_models_w, my_dataset)
-                all_futures.append((dev, future))
-            
-            for dev, future in all_futures:
-                cache = ray.get(future)
-                #append_to_cache(cache)
-                dev.dev_cache.update(cache)
-
-            print('predict split DONE')
-        
-        print('predict_local_parallel DONE')
-
-
-
-    def predict_local_parallel(self):
-        for selected in self.list_split:
-            datasets = self._collect_all_current_datasets(selected)
-            # take 2 first elements of datasets dictionary
-            all_futures = []
-            
-            # Collect futures for all devices first
-            for dev in selected.values(): # devices TODO
-                y = dev.y_clust 
-                models_w = [(i, model.get_weights()) for i, model in dev.mods_clust.items()]
-                future = predict_single_autoencoder_parallel(dev.name, y, models_w, datasets)
-                all_futures.append((dev, future))
-            
-            
-            for dev, future in all_futures:
-                cache = future.result()
-                #append_to_cache(cache)
-                dev.dev_cache.update(cache)
-
-            print('predict split DONE')
-        
-        print('predict_local_parallel DONE')
-
 
     def predict_local_parallel_ray(self):
         for selected in self.list_split:
@@ -483,7 +324,6 @@ class DevManager:
                 all_futures.append((dev, future))
             for dev, future in all_futures:
                 cache = ray.get(future)
-                #append_to_cache(cache)
                 dev.dev_cache.update(cache)
             print('predict split DONE')
         
@@ -506,11 +346,8 @@ class DevManager:
         if use_perfect: # new july
             for dev in devices_list:
                 dev.association_clust = dev.association_perfect.copy()
-                # print dev1.association_clust key values
-                # print('HEEERE')
                 for class2, list2 in dev1.association_clust.items():
                     print()
-                    #print(class2, list2)
 
             print(dev1.association_clust.keys())
 
@@ -521,12 +358,9 @@ class DevManager:
         for selected in self.list_split:
             devices_list = list(selected.values())
             for i, dev1 in enumerate(devices_list):
-                for j, dev2 in enumerate(devices_list[i+1:]): 
+                for j, dev2 in enumerate(devices_list[i+1:]):
                     if dev1.is_stable() and dev2.is_stable():
-                        pass # aspetta non e' detto
-                        #  print skip
-                        #print('skip association', dev1.name, dev2.name)
-                        #continue
+                        pass
                     self.associate_two_devs_new(dev1, dev2, percentile=percentile, th=th, vv=vv, use_only_min=use_only_min)
 
     def association_two_perfect(self, dev1, dev2):
@@ -542,10 +376,6 @@ class DevManager:
     def associate_two_devs_new(self, dev1, dev2, percentile=75, th=0.3, vv=True, use_only_min=True):
         # skip if dev1 and dev2 are the same
         precomputed_errors = {}
-        # matrix of conditions 
-        # print keys
-        #print(dev1.x_dic_true.keys())
-        #print(dev2.x_dic_true.keys())
         m12 = np.zeros((len(dev1.x_dic_clust.keys()), len(dev2.x_dic_clust.keys())))
         m21 = np.zeros((len(dev2.x_dic_clust.keys()), len(dev1.x_dic_clust.keys())))
         
@@ -558,7 +388,6 @@ class DevManager:
                 x_2 = dev2.x_dic_clust[key2]
                 mod_2 = dev2.mods_clust[key2]
 
-                #print('associate_two_devs_new', dev1.name, key1, dev2.name, key2)
                 
                 err_1_mod_1_sampleswise = dev1.compute_reconstruction_errors_new(dev1.name, key1, mod_1, dev1.name, key1, x_1)
                 err_1_mod_2_sampleswise = dev2.compute_reconstruction_errors_new(dev2.name, key2, mod_2, dev1.name, key1, x_1)
@@ -587,31 +416,22 @@ class DevManager:
                 
                 ks_stat2, ks_p_value2 = stats.ks_2samp(err_2_mod_2_sampleswise, err_2_mod_1_sampleswise)
 
-                #condition = ks_p_value1 > 0.05 and ks_p_value2 > 0.05 # Do not reject the null hypothesis
-
-                #condition = Dev.within_percentage(np.mean(err_1_mod_1_sampleswise), np.mean(err_1_mod_2_sampleswise), th)[1] 
-
                 if condition:
                     m12[key1, key2] = np.percentile(dist_1, percentile)
                     m21[key2, key1] = np.percentile(dist_2, percentile)
                     possibile_class1 = dev1.cluster_to_class(key1)
                     possibile_class2 = dev2.cluster_to_class(key2)
 
-                    #print('same distribution', possibile_class1, possibile_class2, 'of dev' , dev1.name, dev2.name)
                     dev1.association_clust.setdefault(possibile_class1, []).append((dev2.name, possibile_class2))
                     dev2.association_clust.setdefault(possibile_class2, []).append((dev1.name, possibile_class1))
                     break # skip to next key1 # TODO
         
-        #print('matrix of conditions')
-        #print(m12)
-        #print(m21)
-        
-                
+
+
     # to avoid too much parallelism, do one federated model at a time
     def fed_communities_all_safe(self, devs, start_port=4000):
         device_dict = {dev.name: dev for dev in devs}
         lst = list(range(4000, 8000, 40))
-        #start_port = np.random.choice(lst)
 
         # Initialize federated models for each device
         for dev in devs:
@@ -625,9 +445,8 @@ class DevManager:
         # Create servers for each community
         for server_port, comm in enumerate(communities, start=1):
             comm = comm[:30]
-            # my_create_server_subproc("localhost", port=str(start_port + server_port), num_clients=len(comm), num_rounds=15) # era cosi con spawn
             my_create_server_subproc.remote("localhost", port=str(start_port + server_port), num_clients=len(comm), num_rounds=15)
-        
+
             time.sleep(5)
             futures = {}
             for dev_name, label in comm:
@@ -635,14 +454,12 @@ class DevManager:
                 cluster = dev.class_to_cluster(label)
                 x_train_portion = dev.x_dic_clust[cluster]
                 key = f"{dev_name}_{label}"
-                #futures[key] = start_flower_client(x_train_portion, label, dev_name, address="localhost", port=str(start_port + server_port)) # era cosi con spawn devi anche cambiare il @concurrent in fl_client e fl_server
                 futures[key] = start_flower_client.remote(x_train_portion, label, dev_name, address="localhost", port=str(start_port + server_port))
-            
+
 
             for dev_name, label in comm:
                 dev = device_dict[dev_name]
                 key = f"{dev_name}_{label}"
-                #dev.fed_models[label] = futures[key].result() # era cosi con spawn. devi anche cambiare il @concurrent in fl_client e fl_server
                 dev.fed_models[label] = ray.get(futures[key])
             print('community', server_port, 'of', len(communities), 'DONE')
 
@@ -666,7 +483,6 @@ class DevManager:
     def fed_communities_all(self, devs, start_port=4000):
         device_dict = {dev.name: dev for dev in devs}
         lst = list(range(4000, 8000, 40))
-        #start_port = np.random.choice(lst)
 
         # Initialize federated models for each device
         for dev in devs:
@@ -680,9 +496,8 @@ class DevManager:
         # Create servers for each community
         for server_port, comm in enumerate(communities, start=1):
             comm = comm[:30]
-            # my_create_server_subproc("localhost", port=str(start_port + server_port), num_clients=len(comm), num_rounds=15) # era cosi con spawn
             my_create_server_subproc.remote("localhost", port=str(start_port + server_port), num_clients=len(comm), num_rounds=15)
-        
+
         time.sleep(5)
         futures = {}
         for server_port, comm in enumerate(communities, start=1):
@@ -692,9 +507,8 @@ class DevManager:
                 cluster = dev.class_to_cluster(label)
                 x_train_portion = dev.x_dic_clust[cluster]
                 key = f"{dev_name}_{label}"
-                #futures[key] = start_flower_client(x_train_portion, label, dev_name, address="localhost", port=str(start_port + server_port)) # era cosi con spawn devi anche cambiare il @concurrent in fl_client e fl_server
                 futures[key] = start_flower_client.remote(x_train_portion, label, dev_name, address="localhost", port=str(start_port + server_port))
-            
+
 
         # Retrieve and set federated models
         for comm in communities:
@@ -702,7 +516,6 @@ class DevManager:
             for dev_name, label in comm:
                 dev = device_dict[dev_name]
                 key = f"{dev_name}_{label}"
-                #dev.fed_models[label] = futures[key].result() # era cosi con spawn. devi anche cambiare il @concurrent in fl_client e fl_server
                 dev.fed_models[label] = ray.get(futures[key])
             print('community', server_port, 'of', len(communities), 'DONE')
 
@@ -733,9 +546,7 @@ class Dev:
         print('init inliers',inliers)
         
         self.data_name = data_name
-        #self.name = '_'.join([str(i) for i in inliers]) # NO BETTER SHUFFLING - dev managaer use dic on names, can be the same
-        # to avoid same names, per prova UIFCA - riportalo come prima  '_'.join([str(i) for i in inliers])
-        
+
         inliers_shuffled = inliers.copy()
         random.shuffle(inliers_shuffled)
         self.name = '_'.join([str(i) for i in inliers_shuffled])
@@ -773,7 +584,6 @@ class Dev:
         self.c = DeepEmbeddingClustering(n_clusters=self.KK, input_dim=784, dev_name=self.name, path_base='saved/'+self.data_name, overwrite_pretrain=overwrite_pretrain)
         self.c.initialize(X, finetune_iters=finetune_iters, layerwise_pretrain_iters=layerwise_pretrain_iters, save_autoencoder=True)
         self.c.cluster(X, y=Y, iter_max=iter_max, overwrite=overwrite)
-        #self.autoencoder = self.c.autoencoder
         self.y_clust = self.predict_cluster(self.x_train)
 
         # create directory if not exists
@@ -792,8 +602,6 @@ class Dev:
     def is_stable(self):
         # last two y_clust are similar (high unsupervised accuracy)
         return self.auto_acc > 0.85
-        
-        #return self.auto_ari > 0.65 # similar
     
 
     def simulate_clustering(self, dirtiness=0.0):
@@ -821,8 +629,6 @@ class Dev:
 
         self.y_clust = y_clust
     
-
-
 
 
     def simulate_clustering_proximity(self, dirtiness=0.0):
@@ -938,12 +744,10 @@ class Dev:
     def train_dev_autoencoders(self, train_only_labs=None):
 
         x_data = self.prepare_data_for_training(train_only_labs=train_only_labs)
-        #y_hash = get_sha256_hash(y) # hash to use if we want to save the model
-        
+
         models = {}
         for lab in x_data.keys(): # keys = labels_to_train
             x = x_data[lab]
-            # hash = 
             weights = train_single_autoencoder(x) 
             models[lab] = get_model_autoencoder()
             models[lab].set_weights(weights)
@@ -956,8 +760,6 @@ class Dev:
         for clust, model in models.items():
             model.set_model_name("M" + str(self.cluster_to_class(clust)))
             self.mods_clust[clust] = model # models can be a subset of all clusters
-
-        #self.mods_class = models # TODO
     # END TRAINING
 
     
@@ -974,48 +776,7 @@ class Dev:
             updated.append(clust)
         return updated
         
-    # the owner of the model is 
-    def my_compute_reconstruction_errors(self, model, x, cache_key, reset=False):
-        errs = self.get_local_cache(cache_key)
-        if errs is None or reset:
-            #print(f'Not found in cache: {cache_key}')
-            pred = model.predict(x, verbose=0, batch_size=128)
-            errs = np.mean(np.square(pred - x), axis=(1)) # #TODO carefull. must be the same as in the model
-            self.save_local_cache(cache_key, errs.tolist())
-        else:
-            #print(f'FOUND')
-            errs = np.array(errs)  # converting back to numpy array if it's stored as a list in cache
-        return errs
-
-    @concurrent.process(context=multiprocessing.get_context('spawn'))
-    def predict_all_parallel(self, datasets=None):
-        print('predict_all_parallel_new', self.name)
-        return self.predict_all(datasets=datasets)
-
-    #@ray.remote
-    def predict_all_parallel_ray(self, datasets=None):
-        print('predict_all_parallel_new', self.name)
-        return self.predict_all(datasets=datasets)
-
-
-    def predict_all(self, datasets=None):
-        dev_name = self.name
-        models = self.mods_clust
-        # cache key
-        datasets
-        for lab, m in models.items():
-            for dev2, device_datasets in datasets.items():
-                for lab2, x2 in device_datasets.items():
-                    self.compute_reconstruction_errors_new(model_device_name = dev_name, model_label = lab, model = m, 
-                                                           data_device_name = dev2, data_label = lab2, data = x2, 
-                                                           reset=False)
-        return -1
-
-
-
     def predict_errors_local_models(self, reset=False):
-        #self.mods_clust = self.train_local_autoencoders(self.y_clust, reset=reset)
-        # check print
         print('self.mods_clust', self.mods_clust)
         for clust, model in self.mods_clust.items():
             print('Model for cluster', clust, 'is', model.model_name)
@@ -1029,8 +790,6 @@ class Dev:
 
     def process_models(self, y, models, reset, compute_average):
         unique_labels = list(np.unique(y))
-        #print('unique_labels', unique_labels)
-        #print('models.keys()', models.keys())
         assert len(models) == len(unique_labels), "Mismatch between number of models and unique labels, {} vs {}".format(len(models), len(unique_labels))
         assert set(models.keys()) == set(unique_labels) # Ensure that models are provided for all unique labels
 
@@ -1038,8 +797,6 @@ class Dev:
         for label in unique_labels:
             x_data = self.get_x_train_for_y(y, label)
             model = models[label]
-            #print('process_models', self.name, label, model.model_name)
-            
             reconstruction_errors = self.compute_reconstruction_errors_new(model_device_name=self.name, model_label=label, model=model, 
                                                                           data_device_name=self.name, data_label=label, data=x_data, reset=reset)
             
@@ -1052,9 +809,7 @@ class Dev:
     
 
     # dev1 is the device that has the models, dev2 is the device that has the data
-    #@staticmethod
     def compute_reconstruction_errors_new(self, model_device_name, model_label, model, data_device_name, data_label, data, reset=False):
-        #cache_key = f"{model_device_name}-{model_label}_{data_device_name}-{data_label}_modelhash={get_model_hash_with_cache(model)}"
         if self.name != model_device_name:
             raise Exception('model_device_name must be the same as self.name')
         cache_key = f"{model_device_name}-{model_label}_{data_device_name}-{data_label}_model_={model.get_model_hash()}"
@@ -1062,7 +817,6 @@ class Dev:
         return errors_samplewise
 
 
-    #@staticmethod
     def _compute_reconstruction_errors(self, model, x, cache_key, reset=False):
         errs = self.get_local_cache(cache_key)
         if errs is None or reset:
@@ -1071,7 +825,6 @@ class Dev:
             errs = np.mean(np.square(pred - x), axis=(1)) # #TODO carefull. must be the same as in the model
             self.save_local_cache(cache_key, errs.tolist())
         else:
-            #print(f'FOUND')
             errs = np.array(errs)  # converting back to numpy array if it's stored as a list in cache
         return errs
 
@@ -1093,20 +846,12 @@ class Dev:
 
 
 
-    # TODO
-    def set_pretrained_models(self, pretrained_models):
-        for lab, model in pretrained_models.items():
-            self.models[lab] = model
-    
-
- 
     def recluster(self, list_dev_other, cluster_key=[0,1], apply=False, list_auto=None):
         # create list_auto from dev_other.mod_clusts. mod_clusts is a dictionary of autoencoders, take all of them
         self.reclustered_times += 1
         if list_auto is None:
-            list_auto = []  
+            list_auto = []
             for dev_other in list_dev_other:
-                #print('recluster', dev_other.name)  
                 list_auto.extend(dev_other.mods_clust.values())
         
         print('Trying num list_auto', len(list_auto))
@@ -1124,7 +869,6 @@ class Dev:
 
 
         x_train_partial = self.x_train[subset_indices]
-        #y_clust_partial = Dev.generic_recluster(len(cluster_key), x_train_partial, list_auto) # return 0,1,2
         y_clust_partial = Dev.recursive_clustering(x_train_partial, np.arange(x_train_partial.shape[0]), len(cluster_key), list_auto=list_auto)
         # map 0,1,2 to cluster_key
         y_clust_partial = np.array([cluster_key[i] for i in y_clust_partial])
@@ -1149,10 +893,8 @@ class Dev:
 
     @staticmethod
     def recursive_clustering(samples, indices, KK, list_auto, list_best = None, y_clust=None, errors=None):
-        #print('KK', KK, 'samples', len(samples))
         if KK == 0 or len(samples) == 0:
             if len(samples) > 0:
-                #print('remaining samples', len(samples))
                 return Dev.recursive_clustering(samples, indices, len(list_best), list_best, [], y_clust)
             return y_clust
 
@@ -1162,8 +904,6 @@ class Dev:
             # to integer
             y_clust = y_clust.astype(int)
 
-        # Compute the errors for each autoencoder
-        
         if errors is None:
             errors = np.zeros((samples.shape[0], len(list_auto)))
             for i, auto in enumerate(list_auto):
@@ -1172,30 +912,21 @@ class Dev:
                 loss = np.mean(np.square(pred - samples), axis=(1)) 
                 errors[:, i] = loss # shape = (n_samples, len(list_auto))
 
-        # Identify the best autoencoder
-        # best_auto_idx = np.argmin(np.sum(errors, axis=0))
-
-        # ---- OPPURE
         #For each sample, determine which autoencoder gives the smallest reconstruction error
         # shape = (n_samples,) # best_auto_for_sample[i] = j means the j-th autoencoder is the best for the i-th sample        
         best_auto_for_sample = np.argmin(errors, axis=1) 
         
         #Tally the number of samples for which each autoencoder is the best
         tally = np.bincount(best_auto_for_sample, minlength=len(list_auto)) # shape = (len(list_auto),) # tally[i] = j means the i-th autoencoder is the best for j samples
-        #print(tally)
         # print names autoencoders
         ll = [auto.model_name for auto in list_auto]
         # do couple (name, tally)
         ll = list(zip(ll, tally))
         # sort by tally
         ll = sorted(ll, key=lambda x: x[1], reverse=True)
-        #####     print(ll) # print the names of the autoencoders in order of tally
-    
-        # 
 
         # Return the autoencoder which is best for the most number of samples
-        best_auto_idx = np.argmax(tally) # comment this 
-        # ---- OPPURE
+        best_auto_idx = np.argmax(tally)
 
         # Assign samples that find this autoencoder as best to the current cluster
         best_samples_mask = np.argmin(errors, axis=1) == best_auto_idx
@@ -1208,7 +939,6 @@ class Dev:
     
         errors = np.delete(errors, best_auto_idx, axis=1)
         errors = np.delete(errors, best_samples_mask, axis=0)
-        #errors = 
 
         # Recursive call for the remaining samples
         return Dev.recursive_clustering(samples[~best_samples_mask], indices[~best_samples_mask], KK-1, list_auto, list_best, y_clust, errors)
@@ -1224,9 +954,7 @@ class Dev:
             pred = auto.predict(x_train, verbose=0)  # shape = (n_samples, 784)
             # loss mean squared error
             loss = np.mean(np.square(pred - x_train), axis=(1))
-            # loss mae
-            # loss = np.mean(np.abs(pred - x_train), axis=(1))
-        
+
             errors[:, i] = loss 
 
         if len(list_auto) == KK: # are they equivalent? credo di si
@@ -1237,9 +965,7 @@ class Dev:
             ranks = np.argsort(errors, axis=1) # each row (sample): sorted indices of errors (the ranks of the autoencoders)
             
             tally = Dev.tally_weighted(ranks, len(list_auto))
-            #tally = Dev.tally_simple(ranks, len(list_auto))
 
-                
             top_indices = np.argsort(tally)[-KK:] # best indices, the last KK elements
             y_clust = np.argmin(errors[:, top_indices], axis=1)
 
@@ -1292,16 +1018,10 @@ class Dev:
                 return
             visited.add((current_device_name, current_dataset))
             community.append((current_device_name, current_dataset))
-            
-            #print('visiting', current_device_name, current_dataset)
-            #print(device_dict[current_device_name].association_clust)
-            
+
             current_dev = device_dict[current_device_name] # recover the device object from the name
-            
-            #for assoc_device_name, assoc_dataset in current_dev.association_clust[current_dataset]:
+
             for assoc_device_name, assoc_dataset in current_dev.association_clust.get(current_dataset, []):
-            #for assoc_device_name, assoc_dataset in current_dev.association_perfect.get(current_dataset, []): # TODO use perfect communities
-                #print(current_device_name, device_dict[current_device_name].wrong_association())
                 dfs(assoc_device_name, assoc_dataset)
 
         dfs(start_device_name, start_dataset)
@@ -1360,9 +1080,6 @@ class Dev:
                 if remove:
                     self.remove_association_clust(class1, devs)
 
-                    
-        #print('multiple_communities', self.name, dcount)
-
 
     def count_different_comm_per_cluster(self):
         dcount = {}
@@ -1381,20 +1098,14 @@ class Dev:
         list_my_comm = dev1.association_clust[lab1] # list of tuples (other_dev, class2)
         dev1.association_clust.pop(lab1) # remove from dev1.association_clust[lab1]
         # now need to remove from other_dev.association_clust[class2] the tuples with self.name
-        #print("------>",list_my_comm)
-        #return 
         for other_dev_name, lab2 in list_my_comm:
-            #print('remove', dev1.name, 'from', other_dev_name, 'association_clust', lab2)
             # remove from other_dev.association_clust[class2] the tuples with self.name
             other_dev = device_dict[other_dev_name]
-            #print(other_dev.association_clust)
             # check if other_dev.association_clust[lab2] exists
             if lab2 not in other_dev.association_clust:
-                #print('lab2 not in other_dev.association_clust')
                 continue
 
-            list_other_comm = other_dev.association_clust[lab2] 
-            #print(list_other_comm)
+            list_other_comm = other_dev.association_clust[lab2]
             list_other_comm = [t for t in list_other_comm if t[0] != dev1.name] # keep only tuples with other_dev_name != self.name
             other_dev.association_clust[lab2] = list_other_comm
 
@@ -1405,52 +1116,3 @@ class Dev:
 
 
 
-  
-  
-    # OLD STUFF
-    def predict_cluster(self, x):
-        q = self.c.DEC.predict(x, verbose=0)
-        y_clust = q.argmax(1)
-        return y_clust
-
-
-    def association_and_2d(self, dev_other): # dati miei roba di altro
-        self.association(dev_other)
-        # pca 2d
-        from sklearn.decomposition import PCA
-        pca = PCA(n_components=2).fit(self.z)
-        
-        self.z_2d = pca.transform(self.z)
-        self.z_center_2d = pca.transform(self.z_center)
-
-        pca = PCA(n_components=2).fit(self.z_other)
-        print('hello')
-        self.z_other_2d = pca.transform(self.z_other)
-        self.z_center_other_2d = pca.transform(self.z_center_other)
-        # pca 2d
-
-    def association(self, dev_other): # dati miei roba di altro
-        #self.x_train_other = dev_other.x_train # cant use it
-        self.y_train_other = dev_other.y_train
-        self.y_clust_other = dev_other.predict_cluster(self.x_train)
-    
-        self.z = self.c.encoder.predict(self.x_train)
-        self.x_dec = self.c.autoencoder.predict(self.x_train)
-
-        self.z_other = dev_other.c.encoder.predict(self.x_train)
-        self.x_dec_other = dev_other.c.autoencoder.predict(self.x_train)
-
-        # x_train encoded with other and decoded with mine
-        self.x_mix = self.c.decoder.predict(self.z_other)
-        
-        self.z_center = self.c.cluster_centres
-        self.z_center_other = dev_other.c.cluster_centres
-
-        ## dictionary that associate self x_dic_true keys with other x_dic_true keys given a condition
-        #assoc_dic = {}
-        ## iterate on the keys of self.x_dic_true
-        #for key in self.x_dic_true.keys():
-        #    if key in dev_other.x_dic_true.keys():   # CONDITION
-        #        assoc_dic[key] = dev_other.name + ' on ' + str(key)
-        #self.assoc_dic = assoc_dic
-        #return self.assoc_dic
