@@ -1,0 +1,15 @@
+{
+  "seed": 42,
+  "dataset_name": "mnist",
+  "num_clients": 5,
+  "num_min_class": 2,
+  "num_max_class": 3,
+  "min_samples_per_class": 50,
+  "max_samples_per_class": 100,
+  "cluster_kind": "oracle",
+  "association_threshold": 0.20,
+  "dirtiness_max": 0.0,
+  "overlap": 0.0,
+  "experiment_group": "quick_test",
+  "start_port": 6500
+}
