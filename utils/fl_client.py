@@ -2,24 +2,16 @@ import os
 import multiprocessing
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-#os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-#os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
-
-
-import argparse
-from pathlib import Path
 
 import numpy as np
-import matplotlib.pyplot as plt
 import tensorflow as tf
 
 import logging
 import flwr as fl
 logging.getLogger("flwr").setLevel(logging.CRITICAL)
 
-from utils.   util_models import get_model_autoencoder, WeightsHashCallback
+from utils.util_models import get_model_autoencoder
 
-from pebble import concurrent
 import ray
 
 class FlClient(fl.client.NumPyClient):

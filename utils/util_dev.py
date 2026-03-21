@@ -60,19 +60,6 @@ def unsupervised_clustering_accuracy(y, y_pred): # y must be 0,1,....like a clus
     return optimal_reward / y_pred.size, assignments 
 
 
-def test_maps():
-    v = np.array([0,2,2,2,2,2,0,2,2,0,8,8,3,3,4,4,0,3])
-    dic_map, arr = map_to_0_1(v)
-    v
-    arr
-    dic_map
-    # revert mapping
-    a,b = unsupervised_clustering_accuracy(arr, v)
-    a
-    b
-    revert_map(dic_map, arr)
-
-
 
 def errs(x1,x2, kind='eucl'):
     if kind == 'eucl':

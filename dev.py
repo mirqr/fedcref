@@ -887,6 +887,7 @@ class Dev:
             self.auto_ari = ari
             self.auto_acc = acc_cluster
             # append to file named with dev name the acc and ari 
+            os.makedirs('metrics', exist_ok=True)
             with open('metrics/ari_nmi_acc_'+self.name+'.txt', 'a') as f:
                 f.write(str(ari) + ' ' + str(nmi) + ' ' + str(acc_cluster) + '\n')
                 # and self.acc

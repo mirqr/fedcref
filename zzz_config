@@ -1,2 +1,0 @@
-mamba deactivate && mamba create --name fedcref python=3.10 uv -y && mamba activate fedcref
-uv pip install tensorflow[and-cuda]==2.14.1 ray[default]==2.8.1 flwr==1.6.0 scikit-learn matplotlib pandas extra_keras_datasets pebble wandb

@@ -1,21 +1,12 @@
 import os
-
+import json
+import time
 
 import numpy as np
 import tensorflow as tf
 
-from tensorflow.keras import layers, losses, metrics
-from tensorflow.keras.datasets import fashion_mnist
-from tensorflow.keras.layers import Dense, Dropout, Flatten, Input, Reshape, Conv2D, Conv2DTranspose, MaxPooling2D, UpSampling2D
-from tensorflow.keras.losses import mean_squared_error
+from tensorflow.keras import layers
 from tensorflow.keras.models import Model, Sequential
-from tensorflow.keras.regularizers import l2
-
-
-
-import json
-import os
-import time
 
 BATCH_SIZE = 150  # number of changes before saving to file
 SAVE_INTERVAL = 30  # seconds before saving to file
@@ -266,104 +257,5 @@ class AutoencoderConv_new(tf.keras.Model):
             self.hashh = hash
         return self.hashh
 
-
-class AutoencoderFlat_old(Model): 
-    def __init__(self, n_features, dropout_rate=0.1, hidden_neurons=[64, 32, 64]):
-        super(AutoencoderFlat, self).__init__()
-        #self.latent_dim = latent_dim
-
-        self.n_features = n_features
-        self.hidden_neurons = hidden_neurons
-        self.dropout_rate = dropout_rate
-
-        first = [
-            # tf.keras.Input(shape=(n_features,)),
-            # layers.Dropout(self.dropout_rate) # to add dropout
-        ]
-        internal = []
-
-        for neu in self.hidden_neurons:
-            internal.append(layers.Dense(neu, activation='relu'))
-            #internal.append(layers.Dropout(self.dropout_rate))
-
-        output = [
-            layers.Dense(n_features, activation='sigmoid')
-            #layers.Reshape((28, 28))
-        ]
-        self.mod = tf.keras.Sequential(first+internal+output)
-
-    def call(self, x):
-        mod = self.mod(x)
-        return mod
-    
-
-class Autoencoder0(Model):
-    def __init__(self, latent_dims):
-        super(Autoencoder0, self).__init__()
-        self.latent_dims = latent_dims
-        enc = [layers.Dense(i, activation="relu") for i in self.latent_dims]
-        dec = [layers.Dense(i, activation="relu") for i in self.latent_dims[::-1]]
-        self.encoder = tf.keras.Sequential([layers.Flatten()] + enc)
-        self.decoder = tf.keras.Sequential(
-            dec + [layers.Dense(784, activation="sigmoid"), layers.Reshape((28, 28))]
-        )
-
-    def call(self, x):
-        encoded = self.encoder(x)
-        decoded = self.decoder(encoded)
-        return decoded
-    
-    
-# hardcoded to 28x28 images
-class AutoencoderConv(Model):
-    def __init__(self):
-        super(AutoencoderConv, self).__init__()
-        
-        self.encoder = tf.keras.Sequential([
-            layers.Reshape((28, 28, 1)),
-            layers.Conv2D(16, (3, 3), activation='relu', padding='same', strides=2),
-            layers.Conv2D(8, (3, 3), activation='relu', padding='same', strides=2)
-            ])
-
-        self.decoder = tf.keras.Sequential([
-            layers.Conv2DTranspose(8, kernel_size=3, strides=2, activation='relu', padding='same'),
-            layers.Conv2DTranspose(16, kernel_size=3, strides=2, activation='relu', padding='same'),
-            layers.Conv2D(1, kernel_size=(3, 3), activation='sigmoid', padding='same'),
-            layers.Flatten()
-            ])
-        
-            
-
-    def call(self, x):
-        encoded = self.encoder(x)
-        decoded = self.decoder(encoded)
-        return decoded
-
-
-# hardcoded to 28x28 images
-class AutoencoderConvV2(Model): 
-    def __init__(self):
-        super(AutoencoderConvV2, self).__init__()
-
-        self.model = Sequential([
-            Reshape((28, 28,1)),
-
-            # Encoder
-            Conv2D(32, (3, 3), activation="relu", padding="same"),
-            MaxPooling2D((2, 2), padding="same"),
-            Conv2D(32, (3, 3), activation="relu", padding="same"),
-            MaxPooling2D((2, 2), padding="same"),
-
-            # Decoder
-            Conv2DTranspose(32, (3, 3), strides=2, activation="relu", padding="same"),
-            Conv2DTranspose(32, (3, 3), strides=2, activation="relu", padding="same"),
-            Conv2D(1, (3, 3), activation="sigmoid", padding="same"),
-            Flatten()
-
-    	])
-
-    def call(self, x):
-        model = self.model(x)
-        return model
 
 

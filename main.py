@@ -2,13 +2,9 @@
 Federated Learning Cluster Discovery - Main Experiment Runner
 
 This script orchestrates the federated learning clustering experiment.
-Run with: python main.py [options]
-See --help for available options.
 """
 
 import os
-import sys
-import argparse
 from datetime import datetime
 from typing import Dict, Any
 
@@ -31,68 +27,6 @@ logging.getLogger("tensorflow").setLevel(logging.ERROR)
 logging.getLogger('tensorflow').disabled = True
 logging.getLogger("absl").setLevel(logging.ERROR)
 
-
-def parse_arguments() -> argparse.Namespace:
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(
-        description="Federated Learning Clustering Experiment",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
-    parser.add_argument('--config', type=str, help='JSON configuration file')
-    parser.add_argument('--seed', type=int, help='Random seed')
-    parser.add_argument('--dataset', type=str,
-                       choices=['mnist', 'fashion_mnist', 'emnist_digits', 'emnist_letters',
-                               'kmnist', 'cifar10', 'femnist-noniid'],
-                       help='Dataset to use')
-    parser.add_argument('--num-clients', type=int, help='Number of clients')
-    parser.add_argument('--cluster-kind', type=str,
-                       choices=['oracle', 'dec', 'dirty_uniform', 'dirty_proximity'],
-                       help='Clustering method')
-    parser.add_argument('--wandb-mode', type=str, default='disabled',
-                       choices=['online', 'offline', 'disabled'],
-                       help='Weights & Biases mode')
-    return parser.parse_args()
-
-
-def merge_settings(args: argparse.Namespace, base_settings: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Merge settings from multiple sources with priority:
-    1. Base settings
-    2. Config file
-    3. Command line arguments
-    """
-    experiment_settings = base_settings.copy()
-
-    # Default overrides
-    defaults = {
-        'seed': 42,
-        'dataset_name': 'emnist_digits',
-        'association_threshold': 0.20,
-        'cluster_kind': 'dirty_uniform',
-        'dirtiness_max': 0.3,
-        'overlap': 0.0,
-        'experiment_group': 'default',
-        'num_max_class': 5,
-        'num_clients': 25,
-    }
-    experiment_settings.update(defaults)
-
-    # Apply config file
-    if args.config:
-        config_settings = exp.load_config_file(args.config)
-        experiment_settings.update(config_settings)
-
-    # Apply CLI arguments
-    if args.seed is not None:
-        experiment_settings['seed'] = args.seed
-    if args.dataset is not None:
-        experiment_settings['dataset_name'] = args.dataset
-    if args.num_clients is not None:
-        experiment_settings['num_clients'] = args.num_clients
-    if args.cluster_kind is not None:
-        experiment_settings['cluster_kind'] = args.cluster_kind
-
-    return experiment_settings
 
 
 def run_iteration_zero(device_manager: DevManager, filename: str) -> None:
@@ -159,29 +93,24 @@ def run_iteration(device_manager: DevManager, devs: list, filename: str,
     return not exp.check_convergence(device_manager, reclustered_mean)
 
 
-def main(programmatic_settings: Dict[str, Any] = None) -> None:
+def main(config: Dict[str, Any] = None) -> None:
     """
     Main experiment function.
 
     Args:
-        programmatic_settings: Optional dict to override settings (for programmatic use)
+        config: Optional dict to override settings from my_config.py
     """
-    # Parse arguments and merge settings
-    args = parse_arguments()
-    experiment_settings = merge_settings(args, settings)
-
-    # Apply programmatic overrides
-    if programmatic_settings:
-        print("Applying programmatic settings overrides...")
-        experiment_settings.update(programmatic_settings)
-        return
+    # Merge settings: my_config.py base, then optional overrides
+    experiment_settings = settings.copy()
+    if config:
+        experiment_settings.update(config)
 
     # Validate
     try:
         exp.validate_settings(experiment_settings)
     except ValueError as e:
-        print(f"✗ Invalid settings: {e}")
-        sys.exit(1)
+        print(f"Invalid settings: {e}")
+        return
 
     # Extract key settings
     seed = experiment_settings['seed']
@@ -189,7 +118,8 @@ def main(programmatic_settings: Dict[str, Any] = None) -> None:
     cluster_kind = experiment_settings['cluster_kind']
     dirtiness_max = experiment_settings['dirtiness_max']
     association_threshold = experiment_settings['association_threshold']
-    experiment_group = experiment_settings.get('experiment_group', 'default')
+    experiment_group = experiment_settings.get('experiment_group')
+    wandb_mode = experiment_settings.get('wandb_mode', 'offline') # can be 'online', 'offline', or 'disabled'
 
     # Set random seed
     np.random.seed(seed)
@@ -213,8 +143,8 @@ def main(programmatic_settings: Dict[str, Any] = None) -> None:
 
     # Initialize W&B
     wandb.init(
-        project="FED_Cluster-november",
-        mode=args.wandb_mode,
+        project="FED_Cluster-2026",
+        mode=wandb_mode, 
         group=experiment_group,
         config=experiment_settings
     )
@@ -231,13 +161,10 @@ def main(programmatic_settings: Dict[str, Any] = None) -> None:
     iteration = 1
     while True:
         should_continue = run_iteration(
-            device_manager, devs, filename, iteration,
-            association_threshold
+            device_manager, devs, filename, iteration, association_threshold
         )
-
         if not should_continue:
             break
-
         iteration += 1
 
     print(f"\n{'='*60}")

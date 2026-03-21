@@ -2,7 +2,7 @@
 settings = {
     'seed': 42,
     'dataset_name': 'mnist',
-    'num_clients': 20,
+    'num_clients': 10,
     'num_min_class': 2,
     'num_max_class': 4,
     'min_samples_per_class': 500,
@@ -15,6 +15,7 @@ settings = {
     'start_port': 4000,
     'experiment_group' : None, # only wandb
     'overlap' : 0,
+    'wandb_mode': 'online', # can be 'online', 'offline', or 'disabled'
     #'layerwise_pretrain_iters': 5000,
     #'overwrite': False,
     #'num_epochs': 10,

@@ -28,8 +28,6 @@ def get_dataset(dataset_name: str, flatten_and_normalize=False):
         (x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
     elif dataset_name == 'fashion_mnist':
         (x_train, y_train), (x_test, y_test) = tf.keras.datasets.fashion_mnist.load_data()
-    elif dataset_name == 'cifar10':
-        (x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar10.load_data()
     elif dataset_name == 'mnist_and_fmnist_merged': #  20 classes
         (x_train0, y_train0), (x_test0, y_test0) = tf.keras.datasets.mnist.load_data()
         (x_train1, y_train1), (x_test1, y_test1) = tf.keras.datasets.fashion_mnist.load_data()
@@ -93,53 +91,6 @@ def get_dataset(dataset_name: str, flatten_and_normalize=False):
     return x_train, y_train, x_test, y_test
 
 
-
-def get_system_new(x_train, y_train, p=0.0, num_clients=10, seed=42):
-    """
-    Split MNIST into num_clients datasets, each as a list of (x, y) tuples.
-
-    p=0 → IID (random across all classes)
-    p=1 → each client gets data from a single class only
-    """
-
-    n = len(x_train)
-    samples_per_client = n // num_clients
-
-    # Group indices by class
-    class_indices = {i: np.where(y_train == i)[0] for i in range(10)}
-    for k in class_indices:
-        np.random.shuffle(class_indices[k])
-
-    clients_data = []
-
-    for client_id in range(num_clients):
-        s = samples_per_client
-        main_class = client_id % 10  # assign one dominant class per client
-
-        num_main = int(s * p)
-        num_rest = s - num_main
-
-        # Get indices for main class
-        main_idx = class_indices[main_class][:num_main]
-        class_indices[main_class] = class_indices[main_class][num_main:]
-
-        # Get random indices from all data (IID part)
-        rest_idx = np.random.choice(n, num_rest, replace=False)
-
-        chosen_idx = np.concatenate([main_idx, rest_idx])
-        np.random.shuffle(chosen_idx)
-
-        # Select data and labels
-        client_x = x_train[chosen_idx]
-        client_y = y_train[chosen_idx]
-
-        # Shuffle within the client
-        client_x, client_y = shuffle(client_x, client_y, random_state=seed)
-
-        # Append as tuple
-        clients_data.append((client_x, client_y))
-
-    return clients_data
 
 # return like a list of (x, y) tuples, one for each client
 @memory.cache(ignore=['x_train'])
@@ -299,32 +250,6 @@ def get_system_femnist(num_clients, num_min_class, num_max_class, unique_classes
 
     return clients_data
 
-def _get_first_perc_class_indices(y, cl, percentage):
-    class_idx = np.where(y==cl)[0]
-    tot = len(class_idx)
-    num_to_select = int(tot*percentage)
-    #print(f"tot {tot}")
-    #print(f"10 perc of samples {cl} is {num_to_select}")
-    class_idx = class_idx[:num_to_select]
-    return class_idx
-
-# substitute first 10% of class cl with first 10% of class cl from x_source, y_source
-def _substitute_first_perc_class(x_target, y_target, cl, percentage, x_source, y_source):
-    x = x_target#.copy()
-    y = y_target#.copy()
-    # print unique y,y_new and their counts
-    #print(f"cl {cl} -- percentage {percentage}")
-    #print(f"y {np.unique(y, return_counts=True)} -- y_new {np.unique(y_source, return_counts=True)}")
-    
-    idx = _get_first_perc_class_indices(y, cl, percentage)
-    idx_new = _get_first_perc_class_indices(y_source, cl, percentage)
-    # idx_new are always more than idx, so we take the first len(idx)
-    assert len(idx_new) >= len(idx)
-    #print(f"len idx_new {len(idx_new)} >= len idx {len(idx)}")
-    idx_new = idx_new[:len(idx)]
-    x[idx] = x_source[idx_new]
-    y[idx] = y_source[idx_new]
-    #return x, y
 
 
 
@@ -420,70 +345,4 @@ def introduce_overlap_new(clients_data, classes, overlap):
         clients_data_new.append((x, y))
         
     return clients_data_new
-
-
-# clients_data # list of (x, y) tuples
-def introduce_overlap(clients_data, classes, overlap):
-    clients_data_new = []
-    processed_indices = set()  # Keep track of processed datasets
-
-    for cl in classes:
-        ls_selected = []
-        (x_max, y_max) = clients_data[0]
-        count = 0
-
-        for i, (x, y) in enumerate(clients_data):
-            if cl in y:
-                ls_selected.append((i, x, y))  # Store the index as well
-                count = np.sum(y == cl)
-                if count > np.sum(y_max == cl):
-                    (x_max, y_max) = (x, y)
-                    
-        for (i, x, y) in ls_selected:
-            _substitute_first_perc_class(x, y, cl, overlap, x_max, y_max)
-            #clients_data_new.append((x, y))
-            #processed_indices.add(i)
-
-    # Append datasets that were not processed (do not contain any of the classes)
-    for i, (x, y) in enumerate(clients_data):
-        if i not in processed_indices:
-            clients_data_new.append((x, y))
-
-
-    return clients_data_new
-
-
-# main 
-if __name__ == '__main__':
-    from dev import Dev
-    dataset_name = 'mnist'
-    x_train, y_train, x_test, y_test = get_dataset(dataset_name, flatten_and_normalize=True)
-    n_features = np.prod(x_train.shape[1:])
-
-    num_clients = 20
-    num_min_class = 2
-    num_max_class = 4
-    # classes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-    # classes using y_train
-    unique_classes = np.unique(y_train)
-
-    clients_data = get_system(num_clients, x_train, y_train, num_min_class, num_max_class, unique_classes=unique_classes, seed=42)
-    print(len(clients_data))
-    
-    # create devs
-    devs = []
-    for i in range(num_clients):
-        x = clients_data[i][0]
-        y = clients_data[i][1]
-        # devs.append(Dev(dataset_name, x, y, inliers=chosen_classes))
-        dev = Dev(dataset_name, x, y)
-        devs.append(dev)
-
-    # take args integer from command line
-    #client = int(sys.argv[1])
-    #devs[client].fit_dec(layerwise_pretrain_iters=5000,overwrite=False)
-
-    
-
-
 
