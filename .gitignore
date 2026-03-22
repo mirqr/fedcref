@@ -178,3 +178,4 @@ wandb/*
 
 __pycache__/*
 log_main/*
+.vscode/*
