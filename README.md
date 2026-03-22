@@ -132,6 +132,10 @@ This creates a conda environment (`fedcref`) and installs all dependencies.
 - `saved/` — cached autoencoders and DEC models
 - Weights & Biases dashboard (if `wandb_mode` is `online` or `offline`)
 
+## AI tools
+
+AI was used for code cleanup and documentation only. All research, algorithms, and implementation are original work by the authors.
+
 ## License
 
 Research project — check with maintainers for usage terms.
