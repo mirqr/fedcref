@@ -10,7 +10,7 @@ Future Generation Computer Systems, Volume 178, May 2026, 108294
 
 ## Overview
 
-![FL system schematic](figures/figures-sys.png)
+![FL system schematic](figures/figures-fl-groups.png)
 
 *N=4 clients, each holding a local dataset with Ki unique data distributions (dotted lines show local cluster splits Qi). The goal is to identify the set of global distributions U (KG=4, shown as distinct shapes) across all clients.*
 
