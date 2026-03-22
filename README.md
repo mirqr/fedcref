@@ -21,7 +21,8 @@ The system discovers client communities in federated learning environments throu
 ```
 fl_cluster/
 ├── main.py                 # Entry point
-├── dev.py                  # Dev (FL client) and DevManager classes
+├── dev.py                  # Dev (FL client) class
+├── dev_manager.py          # DevManager class
 ├── keras_dec.py            # Deep Embedding Clustering
 ├── my_config.py            # All experiment settings
 │
