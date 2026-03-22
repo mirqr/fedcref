@@ -44,7 +44,7 @@ fl_cluster/
   - Tracks reconstruction errors and client associations
   - Computes clustering accuracy metrics (ARI, NMI)
 
-- **DevManager** (`dev.py`): Orchestrates multiple devices
+- **DevManager** (`dev_manager.py`): Orchestrates multiple devices
   - Parallel training using Ray
   - Association analysis across clients
   - Community detection via graph analysis
