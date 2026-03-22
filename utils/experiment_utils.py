@@ -19,7 +19,8 @@ from typing import List, Dict, Tuple, Any
 import numpy as np
 import wandb
 
-from dev import Dev, DevManager
+from dev import Dev
+from dev_manager import DevManager
 from utils.util_data import *
 
 

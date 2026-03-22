@@ -17,7 +17,7 @@ import logging
 import numpy as np
 import wandb
 
-from dev import DevManager
+from dev_manager import DevManager
 from my_config import settings
 from utils import experiment_utils as exp
 
