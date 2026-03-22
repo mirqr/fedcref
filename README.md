@@ -9,7 +9,7 @@ Preprint: https://arxiv.org/abs/2408.10664
 
 ## Overview
 
-<img src="figures/figures-sys.png.png" width="600" alt="FL system schematic">
+![FL system schematic](figures/figures-sys.png)
 
 *N=4 clients, each holding a local dataset with Ki unique data distributions (dotted lines show local cluster splits Qi). The goal is to identify the set of global distributions U (KG=4, shown as distinct shapes) across all clients.*
 
