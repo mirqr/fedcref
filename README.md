@@ -9,6 +9,10 @@ Preprint: https://arxiv.org/abs/2408.10664
 
 ## Overview
 
+<img src="figures/figures-sys.png.png" width="600" alt="FL system schematic">
+
+*N=4 clients, each holding a local dataset with Ki unique data distributions (dotted lines show local cluster splits Qi). The goal is to identify the set of global distributions U (KG=4, shown as distinct shapes) across all clients.*
+
 The system discovers client communities in federated learning environments through reconstruction error analysis. Clients train local autoencoders on their data partitions without sharing raw data. Reconstruction errors across clients serve as a similarity signal — low error indicates similar data distributions. An association graph is built from these errors and decomposed into communities, which drive cluster-wise federated training across iterations.
 
 ## Project Structure

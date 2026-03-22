@@ -132,6 +132,7 @@ def main(config: Dict[str, Any] = None) -> None:
     wandb.define_metric("iteration")
     wandb.define_metric("*", step_metric="iteration")
 
+
     # Set random seed
     np.random.seed(seed)
 

@@ -247,7 +247,6 @@ def get_system_femnist(num_clients, num_min_class, num_max_class, unique_classes
         print(dict(zip(unique, counts)))
         clients_data.append((client_x, client_y))
 
-
     return clients_data
 
 

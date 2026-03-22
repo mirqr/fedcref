@@ -9,7 +9,7 @@ settings = {
     'max_samples_per_class': 600,
     'association_threshold': 0.25,
     'percentile_threshold': 75,
-    'cluster_kind': 'oracle', # 'dirty_uniform', 'dirty_proximity', 'dec'
+    'cluster_kind': 'dirty_uniform', # 'dirty_uniform', 'dirty_proximity', 'dec'
     'dirtiness_max': 0.5,
     'replace_sample': False,
     'start_port': 4000,
