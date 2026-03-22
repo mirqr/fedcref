@@ -4,8 +4,9 @@ This is the code for the paper:
 
 **Federated clustering: An unsupervised cluster-wise training for decentralized data distributions**
 Future Generation Computer Systems, Volume 178, May 2026, 108294
-https://www.sciencedirect.com/science/article/pii/S0167739X25005886
-Preprint: https://arxiv.org/abs/2408.10664
+
+[![Paper](https://img.shields.io/badge/FGCS-2026-blue)](https://www.sciencedirect.com/science/article/pii/S0167739X25005886)
+[![arXiv](https://img.shields.io/badge/arXiv-2408.10664-b31b1b)](https://arxiv.org/abs/2408.10664)
 
 ## Overview
 
