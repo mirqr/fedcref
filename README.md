@@ -58,10 +58,10 @@ fl_cluster/
 
 ## Libraries
 
-- **DL models**: TensorFlow/Keras
-- **Distributed Computing**: Ray, Pebble, Flower (flwr)
+- **DL**: TensorFlow/Keras
+- **Distributed**: Ray, Pebble, Flower (flwr)
 - **Experiment Tracking**: Weights & Biases (wandb)
-- **Data Science**: NumPy, Pandas, Scikit-learn
+- **Data**: NumPy, Pandas, Scikit-learn
 - **Caching**: Joblib
 
 ## Workflow

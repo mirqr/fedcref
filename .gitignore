@@ -175,6 +175,6 @@ metrics/*
 wandb/*
 *.pyc
 
-**/__pycache__/
+
 __pycache__/*
 log_main/*

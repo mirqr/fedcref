@@ -19,7 +19,6 @@ memory = Memory(location=cachedir, verbose=2)
 
 
 import flwr as fl
-from keras_dec import DeepEmbeddingClustering, cluster_acc
 from pebble import concurrent
 from sklearn.metrics import (
     accuracy_score,
@@ -31,6 +30,7 @@ from sklearn.metrics.cluster import normalized_mutual_info_score
 from tensorflow.keras import layers, losses
 from tensorflow.keras.models import Model
 
+from keras_dec import DeepEmbeddingClustering, cluster_acc
 from utils.fl_client import *
 from utils.fl_server import *
 from utils.util_data import get_dataset
@@ -230,7 +230,6 @@ class DevManager:
         return np.mean([dev.auto_acc for dev in self.devices.values()])
     
 
-
     def should_stop(self, values, max_percentage_diff=10, consecutive_limit=3):
         # Return False immediately if there are not enough values
         if len(values) < consecutive_limit + 1 :
@@ -410,6 +409,7 @@ class DevManager:
                 condition = np.percentile(dist_1, percentile) < th and np.percentile(dist_2, percentile) < th
 
                 from scipy import stats
+
                 # Two-sample Kolmogorov-Smirnov test
                 # default two-sided: The null hypothesis is that the two distributions are identical
                 ks_stat1, ks_p_value1 = stats.ks_2samp(err_1_mod_1_sampleswise, err_1_mod_2_sampleswise) 

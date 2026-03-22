@@ -77,8 +77,7 @@ def predict_cluster_proximity_centers(data, centers, metric='euclidean'):
     if data.shape[1] != centers.shape[1]:
         raise ValueError('data and centers must have same shape')
     
-
-    # matrice delle distanze tra ogni punto e ogni centroide
+    # matrix of distances between each point and each centroid
 
     m = cdist(data, centers, metric=metric)
     # if metric == 'cosine': # cosine similarity mi sembra gia inverito

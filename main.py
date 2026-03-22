@@ -121,6 +121,17 @@ def main(config: Dict[str, Any] = None) -> None:
     experiment_group = experiment_settings.get('experiment_group')
     wandb_mode = experiment_settings.get('wandb_mode', 'offline') # can be 'online', 'offline', or 'disabled'
 
+
+    # Initialize W&B
+    wandb.init(
+        project="FedCRef-2026",
+        mode=wandb_mode, 
+        group=experiment_group,
+        config=experiment_settings
+    )
+    wandb.define_metric("iteration")
+    wandb.define_metric("*", step_metric="iteration")
+
     # Set random seed
     np.random.seed(seed)
 
@@ -141,15 +152,6 @@ def main(config: Dict[str, Any] = None) -> None:
 
     print("✓ Initialization complete\n")
 
-    # Initialize W&B
-    wandb.init(
-        project="FED_Cluster-2026",
-        mode=wandb_mode, 
-        group=experiment_group,
-        config=experiment_settings
-    )
-    wandb.define_metric("iteration")
-    wandb.define_metric("*", step_metric="iteration")
 
     # Set up logging
     start_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")

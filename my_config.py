@@ -13,8 +13,8 @@ settings = {
     'dirtiness_max': 0.5,
     'replace_sample': False,
     'start_port': 4000,
-    'experiment_group' : None, # only wandb
     'overlap' : 0,
+    'experiment_group' : None, # only wandb
     'wandb_mode': 'online', # can be 'online', 'offline', or 'disabled'
     #'layerwise_pretrain_iters': 5000,
     #'overwrite': False,
