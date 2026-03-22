@@ -12,7 +12,7 @@ Future Generation Computer Systems, Volume 178, May 2026, 108294
 
 ![FL system schematic](figures/figures-fl-groups.png)
 
-*N=4 clients, each holding a local dataset with Ki unique data distributions (dotted lines show local cluster splits Qi). The goal is to identify the set of global distributions U (KG=4, shown as distinct shapes) across all clients.*
+*N=4 clients, each holding a local dataset with K_i unique data distributions (dotted lines show local -imperfect- cluster splits). The goal is to identify the set of global distributions U (K_G=4, shown as distinct shapes) across all clients.*
 
 The system discovers client communities in federated learning environments through reconstruction error analysis. Clients train local autoencoders on their data partitions without sharing raw data. Reconstruction errors across clients serve as a similarity signal — low error indicates similar data distributions. An association graph is built from these errors and decomposed into communities, which drive cluster-wise federated training across iterations.
 
@@ -21,7 +21,8 @@ The system discovers client communities in federated learning environments throu
 ```
 fl_cluster/
 ├── main.py                 # Entry point
-├── dev.py                  # Dev (FL client) and DevManager classes
+├── dev.py                  # Dev (FL client) class
+├── dev_manager.py          # DevManager class
 ├── keras_dec.py            # Deep Embedding Clustering
 ├── my_config.py            # All experiment settings
 │
@@ -44,7 +45,7 @@ fl_cluster/
   - Tracks reconstruction errors and client associations
   - Computes clustering accuracy metrics (ARI, NMI)
 
-- **DevManager** (`dev.py`): Orchestrates multiple devices
+- **DevManager** (`dev_manager.py`): Orchestrates multiple devices
   - Parallel training using Ray
   - Association analysis across clients
   - Community detection via graph analysis
@@ -71,40 +72,21 @@ fl_cluster/
 
 ## Workflow
 
-1. **Initialization**
-   - Load dataset (MNIST, Fashion-MNIST, EMNIST, etc.)
-   - Distribute data among clients (non-IID with class subsets)
-   - Create Dev objects for each client
+**Setup:** data is distributed across clients in a non-IID fashion. Each client holds samples from a subset of classes. An initial local clustering splits each client's data into K_i local clusters (via oracle, DEC, or simulated noise).
 
-2. **Initial Clustering Phase**
-   Choose one strategy:
-   - **Oracle**: Ground truth baseline mapping
-   - **DEC**: Deep Embedding Clustering (unsupervised)
-   - **Dirty Uniform**: Simulated clustering noise (uniform)
-   - **Dirty Proximity**: Simulated clustering noise (proximity-based)
+Then the following loop runs until convergence:
 
-3. **Iterative Community Discovery**
-   ```
-   For each iteration:
-   ├── Train local autoencoders (parallel via Ray)
-   ├── Predict on all clients' data using all models
-   ├── Compute reconstruction errors (cached)
-   ├── Associate clients based on error thresholds
-   ├── Identify communities (connected components)
-   ├── Log metrics (accuracy, associations, communities)
-   └── Check convergence/stability
-   ```
+1. **Train** — each client trains one autoencoder per local cluster, learning a compact representation of that cluster's data distribution.
 
-4. **Association Mechanism**
-   - Each client trains autoencoders for each cluster in its data
-   - Reconstruction error used as similarity metric
-   - Associates with clients whose data has low reconstruction error
-   - Builds weighted association graph by cluster labels
+2. **Associate** — models are exchanged all-to-all: each model is tested on every cluster of every other client. Two clusters are considered similar if a model trained on one can reconstruct the other with low error — comparable to the self-reconstruction error. Links are formed between clusters that pass this threshold.
 
-5. **Community Detection**
-   - Groups clients into communities based on mutual associations
-   - Tracks: number of communities, isolated clusters, association accuracy
-   - Convergence: stable clustering accuracy or max iterations reached
+3. **Community detection** — the association links form a graph. Connected components identify groups of clusters (across different clients) that share the same underlying data distribution.
+
+4. **Federated averaging** — within each community, clients aggregate their local models via federated averaging, producing one shared global model per community.
+
+5. **Recluster** — all federated models are broadcast to all clients. Each client uses them to re-assign its local samples to clusters, effectively correcting the local partition using global knowledge.
+
+Repeat from step 1 until cluster assignments stabilize.
 
 ## Configuration
 
